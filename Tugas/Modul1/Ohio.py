@@ -1,6 +1,19 @@
 from dataclasses import dataclass, field
 from typing import Dict, List, Tuple, Optional
-from functools import reduce
+
+# Decorator for logging function calls
+def log_function_call(func):
+    def wrapper(*args, **kwargs):
+        print(f"Calling function {func.__name__} with arguments {args} and {kwargs}")
+        result = func(*args, **kwargs)
+        print(f"Function {func.__name__} returned {result}")
+        return result
+    return wrapper
+
+
+# First-Class Function: Higher-order function (passing lambda)
+def filter_valid_accounts(accounts: List[Tuple[str, str]], filter_func) -> List[Tuple[str, str]]:
+    return list(filter(filter_func, accounts))
 
 @dataclass
 class MerchantProfile:
@@ -9,43 +22,43 @@ class MerchantProfile:
     favorite_potato_dish: str = ""
     alien_partners: List[str] = field(default_factory=list)
 
-# Function to register a new user (potato trader) indicating return type of tuple and dict
+# Function to register a new user (potato trader)
+@log_function_call
 def register(accounts: List[Tuple[str, str]], potato_merchants: Dict[str, MerchantProfile]) -> Tuple[List[Tuple[str, str]], Dict[str, MerchantProfile]]:
     print("=== Register as a Potato Trader ===")
     nim = input("Enter your Trader ID (NIM): ")
 
-    # === List Comprehension Example ===
-    # Check if the Trader ID already exists using list comprehension
-    existing_nims = [account[0] for account in accounts]
-    if nim in existing_nims:
+    # Check if the Trader ID already exists using higher-order function
+    accounts = filter_valid_accounts(accounts, lambda account: account[0] == nim)
+    if accounts:
         print("Trader ID already exists!")
         return accounts, potato_merchants
 
     password = input("Create a password: ")
-    accounts = accounts + [(nim, password)]  # Return new accounts list with added tuple
+    accounts.append((nim, password))  # Add new account tuple
 
     print("Trader registered successfully!")
     
     choice = input("Do you want to fill your merchant profile now? (y/n): ").lower()
     if choice == 'y':
         profile = fill_profile()
-        potato_merchants = {**potato_merchants, nim: profile}
+        potato_merchants[nim] = profile
         if len(accounts) > 1:
             potato_merchants = add_alien_partners(nim, accounts, potato_merchants)
     else:
-        potato_merchants = {**potato_merchants, nim: MerchantProfile()}  # Add empty profile
+        potato_merchants[nim] = MerchantProfile()  # Add empty profile
 
     print("Registration complete. Welcome to the Intergalactic Potato Trading Network!")
     return accounts, potato_merchants
 
 # Function to login
+@log_function_call
 def login(accounts: List[Tuple[str, str]], potato_merchants: Dict[str, MerchantProfile]) -> Optional[str]:
     print("=== Login ===")
     nim = input("Enter your Trader ID (NIM): ")
     password = input("Enter your password: ")
 
-    # === List Comprehension Example ===
-    # Validate login credentials
+    # Validate the login credentials
     if any(nim == account[0] and password == account[1] for account in accounts):
         print("Login successful!")
         return nim
@@ -63,6 +76,7 @@ def fill_profile() -> MerchantProfile:
     return MerchantProfile(name, ship, fav_dish)
 
 # Function to add alien trading partners
+@log_function_call
 def add_alien_partners(nim: str, accounts: List[Tuple[str, str]], potato_merchants: Dict[str, MerchantProfile]) -> Dict[str, MerchantProfile]:
     if len(accounts) < 2:
         print("You need at least two traders to add alien partners.")
@@ -70,18 +84,12 @@ def add_alien_partners(nim: str, accounts: List[Tuple[str, str]], potato_merchan
 
     print("=== Add Alien Trading Partners ===")
     partners = input("Enter Alien Partner NIMs (comma separated): ").split(',')
-
-    # === Filter Example ===
-    # Using filter to get valid partners
-    def is_valid_partner(partner: str) -> bool:
-        return any(partner.strip() == account[0] for account in accounts)
-
-    valid_partners = list(filter(is_valid_partner, partners))
+    valid_partners = [partner.strip() for partner in partners if any(partner.strip() == account[0] for account in accounts)]
 
     if valid_partners:
         updated_profile = potato_merchants[nim]
         updated_profile.alien_partners.extend(valid_partners)
-        potato_merchants = {**potato_merchants, nim: updated_profile}
+        potato_merchants[nim] = updated_profile
         print(f"Alien partners added: {', '.join(valid_partners)}")
     else:
         print("No valid alien partners were added.")
@@ -89,6 +97,7 @@ def add_alien_partners(nim: str, accounts: List[Tuple[str, str]], potato_merchan
     return potato_merchants
 
 # Function to show the user menu
+@log_function_call
 def user_menu(nim: str, accounts: List[Tuple[str, str]], potato_merchants: Dict[str, MerchantProfile]) -> Tuple[List[Tuple[str, str]], Dict[str, MerchantProfile]]:
     while True:
         print("\n=== Potato Trader Menu ===")
@@ -104,7 +113,7 @@ def user_menu(nim: str, accounts: List[Tuple[str, str]], potato_merchants: Dict[
         if choice == '1':
             view_profile(nim, potato_merchants)
         elif choice == '2':
-            potato_merchants = {**potato_merchants, nim: fill_profile()}
+            potato_merchants[nim] = fill_profile()
         elif choice == '3':
             view_alien_partners(nim, potato_merchants)
         elif choice == '4':
@@ -133,9 +142,7 @@ def view_profile(nim: str, potato_merchants: Dict[str, MerchantProfile]):
 # Function to view alien partners
 def view_alien_partners(nim: str, potato_merchants: Dict[str, MerchantProfile]):
     print("=== View Alien Trading Partners ===")
-    # === Map Example ===
-    # Converting all partner NIMs to uppercase for display
-    partners = list(map(str.upper, potato_merchants[nim].alien_partners))
+    partners = potato_merchants[nim].alien_partners
     if partners:
         print(f"Alien Partners: {', '.join(partners)}")
     else:
@@ -164,25 +171,6 @@ def delete_data(nim: str, accounts: List[Tuple[str, str]], potato_merchants: Dic
     
     return accounts, potato_merchants
 
-# === Reduce Example ===
-# Count total number of alien partners across all merchants
-def count_total_alien_partners(potato_merchants: Dict[str, MerchantProfile]) -> int:
-    def count_alien_partners(total: int, profile: MerchantProfile) -> int:
-        return total + len(profile.alien_partners)
-
-    return reduce(count_alien_partners, potato_merchants.values(), 0)
-
-# === Recursion Example ===
-# Recursive function to count unique characters in all merchant names
-def count_unique_chars(profiles: List[MerchantProfile], index: int = 0, seen_chars: set = None) -> int:
-    if seen_chars is None:
-        seen_chars = set()
-    if index == len(profiles):
-        return len(seen_chars)
-    
-    seen_chars.update(profiles[index].name)  # Add unique characters of the name
-    return count_unique_chars(profiles, index + 1, seen_chars)
-
 # Main menu
 def main():
     accounts: List[Tuple[str, str]] = []
@@ -207,13 +195,6 @@ def main():
             break
         else:
             print("Invalid option. Please try again.")
-    
-    # Example calls to show how reduce and recursion could be used
-    total_partners = count_total_alien_partners(potato_merchants)
-    print(f"Total Alien Partners Across All Merchants: {total_partners}")
-    
-    unique_char_count = count_unique_chars(list(potato_merchants.values()))
-    print(f"Unique characters in all merchant names: {unique_char_count}")
 
 if __name__ == "__main__":
     main()
